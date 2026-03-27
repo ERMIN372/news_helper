@@ -1,9 +1,12 @@
-name: Deploy to GitHub Pages
+name: Deploy to GitHub Pages with News Parser
 
 on:
   push:
     branches: ["main"]
   workflow_dispatch:
+  # Добавляем расписание! Запуск каждые 3 часа
+  schedule:
+    - cron: '0 */3 * * *' 
 
 permissions:
   contents: read
@@ -21,6 +24,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # --- НАЧАЛО МАГИИ PYTHON ---
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests python-dotenv telethon
+
+      - name: Run News Parser
+        # Передаем секреты из настроек GitHub в переменные окружения скрипта
+        env:
+          NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+          TG_PHONE: ${{ secrets.TG_PHONE }}
+        run: python news_aggregator.py # Убедись, что имя файла совпадает с твоим!
+      # --- КОНЕЦ МАГИИ PYTHON ---
+
+      # Дальше идет твой стандартный билд фронтенда
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
