@@ -9,6 +9,7 @@ import requests
 from dotenv import load_dotenv
 from telethon import TelegramClient
 from telethon.errors import SessionPasswordNeededError
+from telethon.sessions import StringSession
 
 # Настройка логирования
 logging.basicConfig(
