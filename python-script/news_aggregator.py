@@ -61,7 +61,7 @@ class NewsAggregator:
                     'q': query,
                     'language': 'ru', 
                     'sortBy': 'publishedAt',
-                    'pageSize': 3,
+                    'pageSize': 8,
                     'apiKey': NEWSAPI_KEY
                 }
                 response = requests.get(base_url, params=params)
@@ -77,7 +77,9 @@ class NewsAggregator:
                             'description': article['description'],
                             'url': article['url'],
                             'date': article['publishedAt'],
-                            'score': 10 
+                            'score': 10,
+                            'sourceType': 'newsapi',
+                            'content': article.get('content') or article.get('description') or '' 
                         })
             except Exception as e:
                 logger.error(f"Ошибка при получении новостей для категории {category}: {e}")
@@ -100,7 +102,7 @@ class NewsAggregator:
         for channel in TELEGRAM_CHANNELS:
             try:
                 # Получаем последние 5 постов из канала
-                async for message in client.iter_messages(channel, limit=5):
+                async for message in client.iter_messages(channel, limit=8):
                     if message.text:
                         # Простая эвристика: берем первую строку как заголовок
                         lines = message.text.strip().split('\n')
@@ -114,7 +116,9 @@ class NewsAggregator:
                             'description': description,
                             'url': f"https://t.me/{channel}/{message.id}",
                             'date': message.date.isoformat(),
-                            'score': 15 
+                            'score': 15,
+                            'sourceType': 'telegram',
+                            'content': message.text
                         })
             except Exception as e:
                 logger.error(f"Ошибка чтения канала {channel}: {e}")
@@ -122,7 +126,7 @@ class NewsAggregator:
         await client.disconnect()
 
     def rank_and_filter_news(self) -> List[Dict[Any, Any]]:
-        """Простая система ранжирования для формирования Топ-10"""
+        """Простая система ранжирования для формирования расширенного дайджеста"""
         sorted_news = sorted(self.news_items, key=lambda x: x['date'], reverse=True)
         
         seen_titles = set()
@@ -132,7 +136,7 @@ class NewsAggregator:
                 seen_titles.add(item['title'])
                 unique_news.append(item)
                 
-        return unique_news[:10]
+        return unique_news[:30]
 
     def export_to_json(self, top_news, filename="public/news_digest.json"):
         """Экспорт новостей для сайта"""
@@ -152,15 +156,15 @@ async def main():
     # Сбор из Telegram 
     await aggregator.fetch_telegram_news()
     
-    # Формирование Топ-10
-    top_10 = aggregator.rank_and_filter_news()
+    # Формирование расширенного дайджеста
+    top_news = aggregator.rank_and_filter_news()
     
-    logger.info("=== ТОП-10 НОВОСТЕЙ ===")
-    for i, news in enumerate(top_10, 1):
+    logger.info("=== ДАЙДЖЕСТ НОВОСТЕЙ (до 30) ===")
+    for i, news in enumerate(top_news, 1):
         logger.info(f"{i}. [{news['category']}] {news['title']} ({news['source']})")
         
     # Путь сохранения изменен на тот, что требует твой деплой
-    aggregator.export_to_json(top_10, "public/news_digest.json")
+    aggregator.export_to_json(top_news, "public/news_digest.json")
 
 if __name__ == "__main__":
     asyncio.run(main())
