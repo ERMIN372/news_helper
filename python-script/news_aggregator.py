@@ -86,45 +86,67 @@ class NewsAggregator:
                 logger.error(f"Ошибка при получении новостей для категории {category}: {e}")
 
     async def fetch_telegram_news(self):
-        """Сбор новостей из Telegram-каналов через Telethon"""
+        """Сбор новостей из Telegram-каналов через Telethon (с картинками!)"""
         if not TG_API_ID or not TG_API_HASH or not TG_SESSION:
             logger.warning("Telegram креды или TG_SESSION не заданы. Пропуск Telegram.")
             return
 
         logger.info("Запуск сбора новостей из Telegram...")
-        os.makedirs('public/images', exist_ok=True)
-        # Подключаемся сразу через зашифрованную строку, никаких ручных вводов!
+        # Подключаемся сразу через зашифрованную строку
         client = TelegramClient(StringSession(TG_SESSION), TG_API_ID, TG_API_HASH)
         
         await client.connect()
         if not await client.is_user_authorized():
             logger.error("Сессия устарела или неверна! Нужно пересоздать TG_SESSION.")
             return
+
+        # --- НАЧАЛО МАГИИ КАРТИНОК №1 ---
+        # 1. ОБЯЗАТЕЛЬНО: Создаем папку для сохранения картинок НА ДИСК. 
+        # Если папки public/images нет, скачивание упадет!
+        images_on_disk_path = 'public/images'
+        os.makedirs(images_on_disk_path, exist_ok=True)
+        # --- КОНЕЦ МАГИИ КАРТИНОК №1 ---
                 
         for channel in TELEGRAM_CHANNELS:
             try:
-                # Получаем последние 5 постов из канала
+                # Получаем последние 8 постов из канала
                 async for message in client.iter_messages(channel, limit=8):
                     if message.text:
-                        image_url = ''
-                        if message.photo:
-                            image_filename = f"tg_{channel}_{message.id}.jpg"
-                            image_path = f"public/images/{image_filename}"
-                            await client.download_media(message.photo, file=image_path)
-                            image_url = f"images/{image_filename}"
-
-                        # Простая эвристика: берем первую строку как заголовок
+                        # Обработка текста
                         lines = message.text.strip().split('\n')
                         title = lines[0][:100] + '...' if len(lines[0]) > 100 else lines[0]
                         description = message.text[:200] + '...'
                         
+                        # --- НАЧАЛО МАГИИ КАРТИНОК №2 ---
+                        # 2. Инициализируем пустую строку для картинки (дефолт)
+                        final_image_url = '' 
+                        
+                        # 3. ПРОВЕРКА: Ищем в сообщении именно фото
+                        if message.photo:
+                            try:
+                                logger.info(f"Качаю фото для сообщения {message.id} в @{channel}...")
+                                # Генерируем уникальное имя файла
+                                image_filename = f"tg_{channel}_{message.id}.jpg"
+                                # Путь для сохранения НА ДИСК: public/images/file.jpg
+                                full_save_path = os.path.join(images_on_disk_path, image_filename)
+                                
+                                # Скачиваем медиа на диск сервера
+                                await client.download_media(message.photo, file=full_save_path)
+                                
+                                # 4. ВАЖНО: Относительный путь для JSON (для фронтенда): images/file.jpg
+                                final_image_url = f"images/{image_filename}" 
+                            except Exception as download_err:
+                                logger.error(f"Не удалось скачать фото для пота {message.id}: {download_err}")
+                        # --- КОНЕЦ МАГИИ КАРТИНОК №2 ---
+
                         self.news_items.append({
                             'source': f"Telegram (@{channel})",
                             'category': 'Telegram Feed',
                             'title': title,
                             'description': description,
                             'url': f"https://t.me/{channel}/{message.id}",
-                            'image_url': image_url,
+                            # 5. ИСПОЛЬЗУЕМ: Подставляем нашу добытую картинку вместо пустой строки
+                            'image_url': final_image_url, 
                             'date': message.date.isoformat(),
                             'score': 15,
                             'sourceType': 'telegram',
