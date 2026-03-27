@@ -12,6 +12,8 @@ import {
   Clock,
   X,
   FileText,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -90,6 +92,17 @@ const SOURCE_FILTERS = [
 ] as const;
 
 type SourceFilter = (typeof SOURCE_FILTERS)[number]['value'];
+type ThemeMode = 'light' | 'dark';
+
+const THEME_STORAGE_KEY = 'news-helper-theme';
+
+const getPreferredTheme = (): ThemeMode => {
+  if (typeof window === 'undefined') {
+    return 'light';
+  }
+
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+};
 
 export default function App() {
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -101,7 +114,23 @@ export default function App() {
   const [showScriptModal, setShowScriptModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'script' | 'env' | 'readme'>('script');
   const [copiedNewsKey, setCopiedNewsKey] = useState<string | null>(null);
+  const [theme, setTheme] = useState<ThemeMode>(() => {
+    if (typeof window === 'undefined') {
+      return 'light';
+    }
+
+    const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (storedTheme === 'light' || storedTheme === 'dark') {
+      return storedTheme;
+    }
+
+    return getPreferredTheme();
+  });
   const copyFeedbackTimeoutRef = useRef<number | null>(null);
+
+  const toggleTheme = () => {
+    setTheme(prevTheme => (prevTheme === 'dark' ? 'light' : 'dark'));
+  };
 
   const getPostPrompt = (item: NewsItem) =>
     `Действуй по нашей редполитике. Напиши вирусный, вовлекающий пост для Дзена на основе этой новости: ${item.title} — ${item.description}`;
@@ -130,6 +159,12 @@ export default function App() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle('dark', theme === 'dark');
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  }, [theme]);
 
   useEffect(() => {
     const newsUrl = `${import.meta.env.BASE_URL}news_digest.json`;
@@ -168,23 +203,31 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-blue-200">
-      <nav className="sticky top-0 z-40 w-full backdrop-blur-md bg-white/80 border-b border-slate-200 shadow-sm">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-blue-200 dark:bg-slate-950 dark:text-slate-100 dark:selection:bg-blue-800">
+      <nav className="sticky top-0 z-40 w-full backdrop-blur-md bg-white/80 border-b border-slate-200 shadow-sm dark:bg-slate-950/85 dark:border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center gap-2">
               <div className="bg-blue-600 p-2 rounded-lg">
                 <Newspaper className="h-6 w-6 text-white" />
               </div>
-              <span className="font-bold text-xl tracking-tight text-slate-800">
+              <span className="font-bold text-xl tracking-tight text-slate-800 dark:text-slate-100">
                 Nexus<span className="text-blue-600">Feed</span>
               </span>
             </div>
 
             <div className="flex items-center gap-4">
               <button
+                onClick={toggleTheme}
+                className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-2 text-slate-600 shadow-sm transition-colors hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                aria-label={theme === 'dark' ? 'Переключить на светлую тему' : 'Переключить на тёмную тему'}
+                title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
+              >
+                {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              </button>
+              <button
                 onClick={() => setShowScriptModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-colors shadow-sm dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
               >
                 <Terminal className="w-4 h-4" />
                 <span className="hidden sm:inline">Открыть Python-скрипт</span>
@@ -197,14 +240,14 @@ export default function App() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-10 text-center sm:text-left sm:flex sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 sm:text-4xl">
               Ежедневный дайджест: топ новостей
             </h1>
-            <p className="mt-2 text-lg text-slate-600 max-w-2xl">
+            <p className="mt-2 text-lg text-slate-600 dark:text-slate-300 max-w-2xl">
               Подборка новостей из NewsAPI и Telegram. Можно фильтровать источник и открывать полную статью внутри сайта.
             </p>
           </div>
-          <div className="mt-4 sm:mt-0 text-sm font-medium text-slate-500 bg-white px-4 py-2 rounded-full border border-slate-200 shadow-sm inline-flex items-center gap-2">
+          <div className="mt-4 sm:mt-0 text-sm font-medium text-slate-500 bg-white px-4 py-2 rounded-full border border-slate-200 shadow-sm inline-flex items-center gap-2 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300">
             <Clock className="w-4 h-4" />
             Обновлено: сегодня, 10:30
           </div>
@@ -219,7 +262,7 @@ export default function App() {
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                   activeFilter === cat
                     ? 'bg-blue-600 text-white shadow-md'
-                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:border-slate-700'
                 }`}
               >
                 {cat === 'Все' ? 'Все темы' : getCategoryLabel(cat)}
@@ -235,7 +278,7 @@ export default function App() {
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                   activeSourceFilter === filter.value
                     ? 'bg-slate-900 text-white shadow-md'
-                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:border-slate-700'
                 }`}
               >
                 {filter.label}
@@ -247,11 +290,11 @@ export default function App() {
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
             {[1, 2, 3, 4, 5, 6].map(i => (
-              <div key={i} className="bg-white rounded-2xl h-64 border border-slate-100 shadow-sm" />
+              <div key={i} className="bg-white rounded-2xl h-64 border border-slate-100 shadow-sm dark:bg-slate-900 dark:border-slate-800" />
             ))}
           </div>
         ) : loadError ? (
-          <div className="rounded-2xl border border-red-200 bg-red-50 text-red-900 p-6">
+          <div className="rounded-2xl border border-red-200 bg-red-50 text-red-900 p-6 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
             <h2 className="text-lg font-bold mb-2">Ошибка загрузки данных</h2>
             <p className="text-sm mb-3">{loadError}</p>
             <p className="text-sm">
@@ -261,8 +304,8 @@ export default function App() {
           </div>
         ) : (
           <>
-            <div className="text-sm text-slate-500 mb-4">
-              Найдено новостей: <span className="font-semibold text-slate-700">{filteredNews.length}</span>
+            <div className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+              Найдено новостей: <span className="font-semibold text-slate-700 dark:text-slate-200">{filteredNews.length}</span>
             </div>
             <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <AnimatePresence>
@@ -277,7 +320,7 @@ export default function App() {
                     exit={{ opacity: 0, scale: 0.9 }}
                     transition={{ duration: 0.2 }}
                     key={itemKey}
-                    className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-shadow flex flex-col h-full overflow-hidden group"
+                    className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-shadow flex flex-col h-full overflow-hidden group dark:bg-slate-900 dark:border-slate-800"
                   >
                     {item.image_url ? (
                       <img
@@ -293,35 +336,35 @@ export default function App() {
                     )}
                     <div className="p-6 flex flex-col flex-grow">
                       <div className="flex items-center justify-between mb-4 gap-2">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-100">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-100 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700">
                           {getCategoryIcon(item.category)}
                           {getCategoryLabel(item.category)}
                         </span>
-                        <span className="text-xs font-medium text-slate-400">{formatDate(item.date)}</span>
+                        <span className="text-xs font-medium text-slate-400 dark:text-slate-500">{formatDate(item.date)}</span>
                       </div>
 
-                      <h3 className="text-xl font-bold text-slate-900 mb-3 leading-snug group-hover:text-blue-600 transition-colors line-clamp-3">
+                      <h3 className="text-xl font-bold text-slate-900 mb-3 leading-snug group-hover:text-blue-600 transition-colors line-clamp-3 dark:text-slate-100 dark:group-hover:text-blue-400">
                         <button onClick={() => setSelectedNews(item)} className="text-left hover:underline">
                           {item.title}
                         </button>
                       </h3>
 
-                      <p className="text-slate-600 text-sm flex-grow line-clamp-4 mb-6">{item.description}</p>
+                      <p className="text-slate-600 text-sm flex-grow line-clamp-4 mb-6 dark:text-slate-300">{item.description}</p>
 
-                      <div className="pt-4 border-t border-slate-100 flex items-center justify-between mt-auto gap-2">
-                        <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded">
+                      <div className="pt-4 border-t border-slate-100 flex items-center justify-between mt-auto gap-2 dark:border-slate-800">
+                        <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded dark:bg-slate-800 dark:text-slate-300">
                           {item.source}
                         </span>
                         <div className="flex items-center gap-3">
                           <button
                             onClick={() => handleCopyPostPrompt(item, itemKey)}
-                            className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-600 hover:text-emerald-800 transition-colors"
+                            className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-600 hover:text-emerald-800 transition-colors dark:text-emerald-400 dark:hover:text-emerald-300"
                           >
                             {copiedNewsKey === itemKey ? 'Скопировано! ✅' : 'Сделать пост'}
                           </button>
                           <button
                             onClick={() => setSelectedNews(item)}
-                            className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+                            className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors dark:text-blue-400 dark:hover:text-blue-300"
                           >
                             Читать внутри <FileText className="w-3.5 h-3.5" />
                           </button>
@@ -351,42 +394,42 @@ export default function App() {
               initial={{ opacity: 0, y: 20, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.96 }}
-              className="relative bg-white rounded-2xl w-full max-w-4xl max-h-[92vh] overflow-hidden shadow-2xl border border-slate-200 flex flex-col"
+              className="relative bg-white rounded-2xl w-full max-w-4xl max-h-[92vh] overflow-hidden shadow-2xl border border-slate-200 flex flex-col dark:bg-slate-900 dark:border-slate-700"
             >
-              <div className="flex items-start justify-between gap-4 p-6 border-b border-slate-200">
+              <div className="flex items-start justify-between gap-4 p-6 border-b border-slate-200 dark:border-slate-700">
                 <div>
-                  <div className="text-xs text-slate-500 mb-2">{formatDate(selectedNews.date)}</div>
-                  <h2 className="text-2xl font-bold text-slate-900 leading-tight">{selectedNews.title}</h2>
+                  <div className="text-xs text-slate-500 mb-2 dark:text-slate-400">{formatDate(selectedNews.date)}</div>
+                  <h2 className="text-2xl font-bold text-slate-900 leading-tight dark:text-slate-100">{selectedNews.title}</h2>
                 </div>
                 <button
                   onClick={() => setSelectedNews(null)}
-                  className="shrink-0 p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900"
+                  className="shrink-0 p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap gap-2 items-center">
-                <span className="text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-1 rounded">
+              <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap gap-2 items-center dark:border-slate-800">
+                <span className="text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-1 rounded dark:bg-slate-800 dark:text-slate-200">
                   {selectedNews.source}
                 </span>
-                <span className="text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-1 rounded">
+                <span className="text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-1 rounded dark:bg-slate-800 dark:text-slate-200">
                   {getCategoryLabel(selectedNews.category)}
                 </span>
               </div>
 
               <div className="p-6 overflow-y-auto space-y-4">
-                <p className="text-slate-800 leading-7 whitespace-pre-line">
+                <p className="text-slate-800 leading-7 whitespace-pre-line dark:text-slate-200">
                   {selectedNews.content || selectedNews.description || 'Текст статьи не передан агрегатором.'}
                 </p>
               </div>
 
-              <div className="p-6 border-t border-slate-200 bg-slate-50 flex justify-end">
+              <div className="p-6 border-t border-slate-200 bg-slate-50 flex justify-end dark:border-slate-700 dark:bg-slate-950">
                 <a
                   href={selectedNews.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800"
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                 >
                   Открыть оригинал <ExternalLink className="w-4 h-4" />
                 </a>
