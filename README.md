@@ -33,6 +33,17 @@ npm run preview
 2. Открой вкладку `Actions` и дождись успешного workflow **Deploy to GitHub Pages**.
 3. В `Settings → Pages` появится URL сайта.
 
+## Если видишь белый экран на GitHub Pages
+
+Самая частая причина: в `Settings → Pages` выбран `Deploy from a branch`, и GitHub отдает исходники (`src/main.tsx`) без Vite-сборки.
+
+Нужно:
+1. Открыть `Settings → Pages`.
+2. В `Source` выбрать **GitHub Actions**.
+3. Перезапустить workflow **Deploy to GitHub Pages** на вкладке `Actions`.
+
+После этого открой URL вида `https://<user>.github.io/<repo>/`.
+
 ## Примечание по путям
 
 В workflow используется `npm run build -- --base=./`, чтобы ассеты корректно работали на GitHub Pages независимо от имени репозитория.
