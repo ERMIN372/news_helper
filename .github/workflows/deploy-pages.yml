@@ -41,8 +41,9 @@ jobs:
           NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
           TG_API_ID: ${{ secrets.TG_API_ID }}
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
-          TG_PHONE: ${{ secrets.TG_PHONE }}
-        run: python news_aggregator.py # Убедись, что имя файла совпадает с твоим!
+          TG_SESSION: ${{ secrets.TG_SESSION }} # Исправлено на секретную строку!
+        # Исправлен путь к файлу (указана папка python-script)
+        run: python python-script/news_aggregator.py 
       # --- КОНЕЦ МАГИИ PYTHON ---
 
       # Дальше идет твой стандартный билд фронтенда
@@ -68,6 +69,11 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
     needs: build
     steps:
       - name: Deploy to GitHub Pages
