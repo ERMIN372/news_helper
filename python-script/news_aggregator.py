@@ -38,12 +38,12 @@ NEWSAPI_TOPICS = {
 
 # Telegram каналы по темам (укажите реальные username каналов)
 TELEGRAM_CHANNELS = [
-    'it_news_channel',      # Пример: IT & AI
-    'politics_channel_ru',  # Пример: Политика
-    'auto_news_ru',         # Пример: Авто
-    'hr_trends_ru',         # Пример: HR
-    'rock_metal_news',      # Пример: Рок/Метал
-    'retail_neft'           # Пример: Ритейл и АЗС
+    'rhymestg',      # Пример: IT & AI
+    'techmedia',  # Пример: Политика
+    'whackdoor',         # Пример: Авто
+    'mash',         # Пример: HR
+    'ria',      # Пример: Рок/Метал
+    'topor'           # Пример: Ритейл и АЗС
 ]
 
 class NewsAggregator:
