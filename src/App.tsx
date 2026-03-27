@@ -1,39 +1,51 @@
-import { useEffect, useState } from 'react';
-import { 
-  Newspaper, 
-  Terminal, 
-  Cpu, 
-  Car, 
-  Landmark, 
-  Users, 
-  Music, 
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Newspaper,
+  Terminal,
+  Cpu,
+  Car,
+  Landmark,
+  Users,
+  Music,
   Fuel,
   ExternalLink,
-  Clock
+  Clock,
+  X,
+  FileText,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// Types
 interface NewsItem {
   source: string;
+  sourceType?: 'newsapi' | 'telegram';
   category: string;
   title: string;
   description: string;
+  content?: string;
   url: string;
   date: string;
   score: number;
 }
 
-// Иконки по категориям
 const getCategoryIcon = (category: string) => {
   switch (category) {
-    case 'IT & AI': return <Cpu className="w-5 h-5 text-blue-500" />;
-    case 'Politics': return <Landmark className="w-5 h-5 text-gray-600" />;
-    case 'Automotive': return <Car className="w-5 h-5 text-red-500" />;
-    case 'HR Analytics': return <Users className="w-5 h-5 text-indigo-500" />;
-    case 'Rock & Metal': return <Music className="w-5 h-5 text-purple-500" />;
-    case 'Retail & Gas Stations': return <Fuel className="w-5 h-5 text-orange-500" />;
-    default: return <Newspaper className="w-5 h-5 text-emerald-500" />;
+    case 'IT & AI':
+      return <Cpu className="w-5 h-5 text-blue-500" />;
+    case 'Politics':
+      return <Landmark className="w-5 h-5 text-gray-600" />;
+    case 'Automotive':
+    case 'Auto':
+      return <Car className="w-5 h-5 text-red-500" />;
+    case 'HR Analytics':
+      return <Users className="w-5 h-5 text-indigo-500" />;
+    case 'Rock & Metal':
+    case 'Rock/Metal':
+      return <Music className="w-5 h-5 text-purple-500" />;
+    case 'Retail & Gas Stations':
+    case 'Retail & Gas':
+      return <Fuel className="w-5 h-5 text-orange-500" />;
+    default:
+      return <Newspaper className="w-5 h-5 text-emerald-500" />;
   }
 };
 
@@ -41,31 +53,54 @@ const CATEGORY_LABELS: Record<string, string> = {
   'IT & AI': 'ИТ и ИИ',
   Politics: 'Политика',
   Automotive: 'Авто',
+  Auto: 'Авто',
   'HR Analytics': 'HR-аналитика',
   'Rock & Metal': 'Рок и металл',
+  'Rock/Metal': 'Рок и металл',
   'Retail & Gas Stations': 'Ритейл и АЗС',
-  'Telegram Feed': 'Лента Telegram'
+  'Retail & Gas': 'Ритейл и АЗС',
+  'Telegram Feed': 'Лента Telegram',
 };
 
 const getCategoryLabel = (category: string) => CATEGORY_LABELS[category] ?? category;
 
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
-  return new Intl.DateTimeFormat('ru-RU', { 
-    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' 
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
   }).format(date);
 };
+
+const getSourceType = (item: NewsItem): 'newsapi' | 'telegram' => {
+  if (item.sourceType) {
+    return item.sourceType;
+  }
+
+  return item.source.toLowerCase().includes('telegram') ? 'telegram' : 'newsapi';
+};
+
+const SOURCE_FILTERS = [
+  { value: 'all', label: 'Все источники' },
+  { value: 'newsapi', label: 'Только NewsAPI' },
+  { value: 'telegram', label: 'Только Telegram' },
+] as const;
+
+type SourceFilter = (typeof SOURCE_FILTERS)[number]['value'];
 
 export default function App() {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<string>('Все');
+  const [activeSourceFilter, setActiveSourceFilter] = useState<SourceFilter>('all');
+  const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const [showScriptModal, setShowScriptModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'script' | 'env' | 'readme'>('script');
 
   useEffect(() => {
-    // Always resolve against Vite base (important for GitHub Pages project URLs)
     const newsUrl = `${import.meta.env.BASE_URL}news_digest.json`;
 
     fetch(newsUrl)
@@ -87,15 +122,22 @@ export default function App() {
       });
   }, []);
 
-  const categories = ['Все', ...Array.from(new Set(news.map(n => n.category)))];
-  
-  const filteredNews = activeFilter === 'Все' 
-    ? news 
-    : news.filter(n => n.category === activeFilter);
+  const categories = useMemo(() => ['Все', ...Array.from(new Set(news.map(n => n.category)))], [news]);
+
+  const filteredNews = useMemo(
+    () =>
+      news.filter(item => {
+        const categoryMatches = activeFilter === 'Все' || item.category === activeFilter;
+        const sourceType = getSourceType(item);
+        const sourceMatches = activeSourceFilter === 'all' || sourceType === activeSourceFilter;
+
+        return categoryMatches && sourceMatches;
+      }),
+    [news, activeFilter, activeSourceFilter],
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-blue-200">
-      {/* Navbar */}
       <nav className="sticky top-0 z-40 w-full backdrop-blur-md bg-white/80 border-b border-slate-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
@@ -107,9 +149,9 @@ export default function App() {
                 Nexus<span className="text-blue-600">Feed</span>
               </span>
             </div>
-            
+
             <div className="flex items-center gap-4">
-              <button 
+              <button
                 onClick={() => setShowScriptModal(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
               >
@@ -122,14 +164,13 @@ export default function App() {
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header Section */}
         <div className="mb-10 text-center sm:text-left sm:flex sm:items-end sm:justify-between">
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
-              Ежедневный дайджест: топ-10
+              Ежедневный дайджест: топ новостей
             </h1>
             <p className="mt-2 text-lg text-slate-600 max-w-2xl">
-              Подборка новостей, собранная автоматическим Python-агрегатором. Основные темы: ИТ, политика, авто, HR, металл и ритейл.
+              Подборка новостей из NewsAPI и Telegram. Можно фильтровать источник и открывать полную статью внутри сайта.
             </p>
           </div>
           <div className="mt-4 sm:mt-0 text-sm font-medium text-slate-500 bg-white px-4 py-2 rounded-full border border-slate-200 shadow-sm inline-flex items-center gap-2">
@@ -138,28 +179,44 @@ export default function App() {
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap gap-2 mb-8">
-          {categories.map(cat => (
-            <button
-              key={cat}
-              onClick={() => setActiveFilter(cat)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                activeFilter === cat 
-                  ? 'bg-blue-600 text-white shadow-md' 
-                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-              }`}
-            >
-              {cat === 'Все' ? 'Все темы' : getCategoryLabel(cat)}
-            </button>
-          ))}
+        <div className="space-y-4 mb-8">
+          <div className="flex flex-wrap gap-2">
+            {categories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setActiveFilter(cat)}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  activeFilter === cat
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                }`}
+              >
+                {cat === 'Все' ? 'Все темы' : getCategoryLabel(cat)}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {SOURCE_FILTERS.map(filter => (
+              <button
+                key={filter.value}
+                onClick={() => setActiveSourceFilter(filter.value)}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  activeSourceFilter === filter.value
+                    ? 'bg-slate-900 text-white shadow-md'
+                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                }`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* News Grid */}
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
             {[1, 2, 3, 4, 5, 6].map(i => (
-              <div key={i} className="bg-white rounded-2xl h-64 border border-slate-100 shadow-sm"></div>
+              <div key={i} className="bg-white rounded-2xl h-64 border border-slate-100 shadow-sm" />
             ))}
           </div>
         ) : loadError ? (
@@ -167,80 +224,134 @@ export default function App() {
             <h2 className="text-lg font-bold mb-2">Ошибка загрузки данных</h2>
             <p className="text-sm mb-3">{loadError}</p>
             <p className="text-sm">
-              Проверь, что в деплое есть файл <code>news_digest.json</code> и GitHub Pages
-              настроен на <strong>GitHub Actions</strong>, а не на <strong>Deploy from a branch</strong>.
+              Проверь, что в деплое есть файл <code>news_digest.json</code> и GitHub Pages настроен на{' '}
+              <strong>GitHub Actions</strong>, а не на <strong>Deploy from a branch</strong>.
             </p>
           </div>
         ) : (
-          <motion.div 
-            layout
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-          >
-            <AnimatePresence>
-              {filteredNews.map((item, index) => (
-                <motion.article
-                  layout
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  transition={{ duration: 0.2 }}
-                  key={item.title + index}
-                  className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-shadow flex flex-col h-full overflow-hidden group"
-                >
-                  <div className="p-6 flex flex-col flex-grow">
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-100">
-                        {getCategoryIcon(item.category)}
-                        {getCategoryLabel(item.category)}
-                      </span>
-                      <span className="text-xs font-medium text-slate-400">
-                        {formatDate(item.date)}
-                      </span>
+          <>
+            <div className="text-sm text-slate-500 mb-4">
+              Найдено новостей: <span className="font-semibold text-slate-700">{filteredNews.length}</span>
+            </div>
+            <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <AnimatePresence>
+                {filteredNews.map((item, index) => (
+                  <motion.article
+                    layout
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{ duration: 0.2 }}
+                    key={item.title + index}
+                    className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-shadow flex flex-col h-full overflow-hidden group"
+                  >
+                    <div className="p-6 flex flex-col flex-grow">
+                      <div className="flex items-center justify-between mb-4 gap-2">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-100">
+                          {getCategoryIcon(item.category)}
+                          {getCategoryLabel(item.category)}
+                        </span>
+                        <span className="text-xs font-medium text-slate-400">{formatDate(item.date)}</span>
+                      </div>
+
+                      <h3 className="text-xl font-bold text-slate-900 mb-3 leading-snug group-hover:text-blue-600 transition-colors line-clamp-3">
+                        <button onClick={() => setSelectedNews(item)} className="text-left hover:underline">
+                          {item.title}
+                        </button>
+                      </h3>
+
+                      <p className="text-slate-600 text-sm flex-grow line-clamp-4 mb-6">{item.description}</p>
+
+                      <div className="pt-4 border-t border-slate-100 flex items-center justify-between mt-auto gap-2">
+                        <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded">
+                          {item.source}
+                        </span>
+                        <button
+                          onClick={() => setSelectedNews(item)}
+                          className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+                        >
+                          Читать внутри <FileText className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                    
-                    <h3 className="text-xl font-bold text-slate-900 mb-3 leading-snug group-hover:text-blue-600 transition-colors line-clamp-3">
-                      <a href={item.url} target="_blank" rel="noopener noreferrer">
-                        {item.title}
-                      </a>
-                    </h3>
-                    
-                    <p className="text-slate-600 text-sm flex-grow line-clamp-4 mb-6">
-                      {item.description}
-                    </p>
-                    
-                    <div className="pt-4 border-t border-slate-100 flex items-center justify-between mt-auto">
-                      <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded">
-                        {item.source}
-                      </span>
-                      <a 
-                        href={item.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors"
-                      >
-                        Читать <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
-                    </div>
-                  </div>
-                </motion.article>
-              ))}
-            </AnimatePresence>
-          </motion.div>
+                  </motion.article>
+                ))}
+              </AnimatePresence>
+            </motion.div>
+          </>
         )}
       </main>
 
-      {/* Script Modal */}
+      <AnimatePresence>
+        {selectedNews && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm"
+              onClick={() => setSelectedNews(null)}
+            />
+            <motion.article
+              initial={{ opacity: 0, y: 20, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.96 }}
+              className="relative bg-white rounded-2xl w-full max-w-4xl max-h-[92vh] overflow-hidden shadow-2xl border border-slate-200 flex flex-col"
+            >
+              <div className="flex items-start justify-between gap-4 p-6 border-b border-slate-200">
+                <div>
+                  <div className="text-xs text-slate-500 mb-2">{formatDate(selectedNews.date)}</div>
+                  <h2 className="text-2xl font-bold text-slate-900 leading-tight">{selectedNews.title}</h2>
+                </div>
+                <button
+                  onClick={() => setSelectedNews(null)}
+                  className="shrink-0 p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap gap-2 items-center">
+                <span className="text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-1 rounded">
+                  {selectedNews.source}
+                </span>
+                <span className="text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-1 rounded">
+                  {getCategoryLabel(selectedNews.category)}
+                </span>
+              </div>
+
+              <div className="p-6 overflow-y-auto space-y-4">
+                <p className="text-slate-800 leading-7 whitespace-pre-line">
+                  {selectedNews.content || selectedNews.description || 'Текст статьи не передан агрегатором.'}
+                </p>
+              </div>
+
+              <div className="p-6 border-t border-slate-200 bg-slate-50 flex justify-end">
+                <a
+                  href={selectedNews.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800"
+                >
+                  Открыть оригинал <ExternalLink className="w-4 h-4" />
+                </a>
+              </div>
+            </motion.article>
+          </div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {showScriptModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
               onClick={() => setShowScriptModal(false)}
             />
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -249,30 +360,59 @@ export default function App() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between px-6 py-3 border-b border-slate-800 bg-slate-900/80">
                 <div className="flex items-center gap-6 overflow-x-auto">
                   <div className="flex gap-1.5 hidden sm:flex">
-                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                    <div className="w-3 h-3 rounded-full bg-red-500" />
+                    <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                    <div className="w-3 h-3 rounded-full bg-green-500" />
                   </div>
                   <div className="flex space-x-1">
-                    <button onClick={() => setActiveTab('script')} className={`px-4 py-2 rounded-t-lg font-mono text-sm transition-colors ${activeTab === 'script' ? 'bg-[#0d1117] text-white border-t border-x border-slate-700' : 'text-slate-400 hover:text-slate-200'}`}>news_aggregator.py</button>
-                    <button onClick={() => setActiveTab('env')} className={`px-4 py-2 rounded-t-lg font-mono text-sm transition-colors ${activeTab === 'env' ? 'bg-[#0d1117] text-white border-t border-x border-slate-700' : 'text-slate-400 hover:text-slate-200'}`}>.env.example</button>
-                    <button onClick={() => setActiveTab('readme')} className={`px-4 py-2 rounded-t-lg font-mono text-sm transition-colors ${activeTab === 'readme' ? 'bg-[#0d1117] text-white border-t border-x border-slate-700' : 'text-slate-400 hover:text-slate-200'}`}>README.md</button>
+                    <button
+                      onClick={() => setActiveTab('script')}
+                      className={`px-4 py-2 rounded-t-lg font-mono text-sm transition-colors ${
+                        activeTab === 'script'
+                          ? 'bg-[#0d1117] text-white border-t border-x border-slate-700'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      news_aggregator.py
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('env')}
+                      className={`px-4 py-2 rounded-t-lg font-mono text-sm transition-colors ${
+                        activeTab === 'env'
+                          ? 'bg-[#0d1117] text-white border-t border-x border-slate-700'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      .env.example
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('readme')}
+                      className={`px-4 py-2 rounded-t-lg font-mono text-sm transition-colors ${
+                        activeTab === 'readme'
+                          ? 'bg-[#0d1117] text-white border-t border-x border-slate-700'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      README.md
+                    </button>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => setShowScriptModal(false)}
                   className="text-slate-400 hover:text-white transition-colors text-sm font-medium px-3 py-1 bg-slate-800 rounded-md"
                 >
                   Закрыть
                 </button>
               </div>
-              
+
               <div className="p-6 overflow-y-auto custom-scrollbar bg-[#0d1117] text-slate-300 font-mono text-sm leading-relaxed min-h-[50vh]">
-                <pre><code>
-                  {activeTab === 'script' && PYTHON_SCRIPT_CODE}
-                  {activeTab === 'env' && ENV_CODE}
-                  {activeTab === 'readme' && README_CODE}
-                </code></pre>
+                <pre>
+                  <code>
+                    {activeTab === 'script' && PYTHON_SCRIPT_CODE}
+                    {activeTab === 'env' && ENV_CODE}
+                    {activeTab === 'readme' && README_CODE}
+                  </code>
+                </pre>
               </div>
             </motion.div>
           </div>
@@ -284,190 +424,28 @@ export default function App() {
           width: 8px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
-          background: #0d1117; 
+          background: #0d1117;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #30363d; 
+          background: #30363d;
           border-radius: 4px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #484f58; 
+          background: #484f58;
         }
       `}</style>
     </div>
   );
 }
 
-const PYTHON_SCRIPT_CODE = `import os
-import json
-import logging
-import asyncio
-from typing import List, Dict, Any
-
-import requests
-from dotenv import load_dotenv
-from telethon import TelegramClient
-from telethon.errors import SessionPasswordNeededError
-
-# Настройка логирования
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
-load_dotenv()
-
-# Ключи API
-NEWSAPI_KEY = os.getenv('NEWSAPI_KEY')
-TG_API_ID = int(os.getenv('TG_API_ID', 0))
-TG_API_HASH = os.getenv('TG_API_HASH')
-TG_PHONE = os.getenv('TG_PHONE')
-
-NEWSAPI_TOPICS = {
-    "IT & AI": "artificial intelligence OR software development OR IT industry",
-    "Politics": "politics OR government",
-    "Automotive": "automotive OR cars OR electric vehicles",
-    "HR Analytics": "HR analytics OR human resources trends",
-    "Rock & Metal": "rock music OR metal music",
-    "Retail & Gas Stations": "retail OR gas station OR fuel market"
-}
-
-TELEGRAM_CHANNELS = [
-    'it_news_channel',      # IT & AI
-    'politics_channel_ru',  # Политика
-    'auto_news_ru',         # Авто
-    'hr_trends_ru',         # HR
-    'rock_metal_news',      # Рок/Метал
-    'retail_neft'           # Ритейл и АЗС (Нефтьмагистраль)
-]
-
-class NewsAggregator:
-    def __init__(self):
-        self.news_items = []
-        
-    def fetch_news_api(self):
-        logger.info("Запуск сбора новостей через NewsAPI...")
-        base_url = "https://newsapi.org/v2/everything"
-        for category, query in NEWSAPI_TOPICS.items():
-            try:
-                params = {
-                    'q': query, 'language': 'ru', 'sortBy': 'publishedAt',
-                    'pageSize': 3, 'apiKey': NEWSAPI_KEY
-                }
-                response = requests.get(base_url, params=params)
-                response.raise_for_status()
-                for article in response.json().get('articles', []):
-                    if article['title']:
-                        self.news_items.append({
-                            'source': f"NewsAPI ({article['source']['name']})",
-                            'category': category,
-                            'title': article['title'],
-                            'description': article['description'] or '',
-                            'url': article['url'],
-                            'date': article['publishedAt'],
-                            'score': 10
-                        })
-            except Exception as e:
-                logger.error(f"Ошибка NewsAPI ({category}): {e}")
-
-    async def fetch_telegram_news(self):
-        if not TG_API_ID or not TG_API_HASH:
-            logger.warning("Telegram API креды не заданы. Пропуск.")
-            return
-
-        logger.info("Сбор новостей из Telegram...")
-        client = TelegramClient('news_session', TG_API_ID, TG_API_HASH)
-        await client.connect()
-        
-        # Авторизация если нужно (отправка кода на TG_PHONE)
-        if not await client.is_user_authorized():
-            await client.send_code_request(TG_PHONE)
-            await client.sign_in(TG_PHONE, input('Код из Telegram: '))
-                
-        for channel in TELEGRAM_CHANNELS:
-            try:
-                async for message in client.iter_messages(channel, limit=3):
-                    if message.text:
-                        lines = message.text.strip().split('\\n')
-                        self.news_items.append({
-                            'source': f"Telegram (@{channel})",
-                            'category': 'Telegram Feed',
-                            'title': lines[0][:100] + '...',
-                            'description': message.text[:200] + '...',
-                            'url': f"https://t.me/{channel}/{message.id}",
-                            'date': message.date.isoformat(),
-                            'score': 15
-                        })
-            except Exception as e:
-                logger.error(f"Ошибка канала {channel}: {e}")
-        await client.disconnect()
-
-    def rank_and_export(self, filename="public/news_digest.json"):
-        # Сортировка по дате и удаление дубликатов
-        sorted_news = sorted(self.news_items, key=lambda x: x['date'], reverse=True)
-        unique_news = {item['title']: item for item in sorted_news}.values()
-        top_10 = list(unique_news)[:10]
-        
-        with open(filename, 'w', encoding='utf-8') as f:
-            json.dump(top_10, f, ensure_ascii=False, indent=4)
-        logger.info(f"Топ-10 сохранен в {filename}")
-
-async def main():
-    aggregator = NewsAggregator()
-    aggregator.fetch_news_api()
-    await aggregator.fetch_telegram_news()
-    aggregator.rank_and_export()
-
-if __name__ == "__main__":
-    asyncio.run(main())
-`;
+const PYTHON_SCRIPT_CODE = `См. файл python-script/news_aggregator.py для актуальной версии скрипта.`;
 
 const ENV_CODE = `# NewsAPI
 NEWSAPI_KEY=your_news_api_key_here
 
-# Telegram (Telethon) - Получить на https://my.telegram.org/apps
+# Telegram (Telethon)
 TG_API_ID=your_api_id_here
 TG_API_HASH=your_api_hash_here
-TG_PHONE=+1234567890
+TG_SESSION=your_string_session_here`;
 
-# Темы для парсинга
-# IT & AI, Politics, Auto, HR Analytics, Rock/Metal, Retail & Gas
-`;
-
-const README_CODE = `# Python News Aggregator
-
-Масштабируемый скрипт для сбора новейших и самых интересных новостей по вашим интересам.
-Интегрирует NewsAPI для сбора статей и Telethon для чтения Telegram-каналов напрямую.
-
-## Требования
-
-- Python 3.8+
-
-## Установка
-
-1. Создайте виртуальное окружение:
-python -m venv venv
-source venv/bin/activate  # Для Linux/Mac
-venv\\Scripts\\activate     # Для Windows
-
-2. Установите зависимости:
-pip install requests python-dotenv telethon
-
-3. Настройте файл переменных окружения:
-- Скопируйте .env.example в .env
-- Получите API-ключ для NewsAPI
-- Получите api_id и api_hash для Telegram на my.telegram.org/apps
-- Впишите ваши данные в .env
-
-## Запуск скрипта
-
-Запустите скрипт командой:
-python news_aggregator.py
-
-При первом запуске Telethon может запросить код подтверждения, который придёт в ваш аккаунт Telegram.
-
-## Как это работает?
-
-- Скрипт синхронно собирает новости из NewsAPI по ключевым словам.
-- Асинхронно подключается к Telegram через Telethon и забирает последние посты из каналов.
-- Оценивает и фильтрует уникальные новости, собирая Топ-10 дайджест.
-- Сохраняет результат в формате JSON, откуда фронтенд читает его.
-`;
+const README_CODE = `Документация по агрегатору: python-script/README.md`;
