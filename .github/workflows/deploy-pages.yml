@@ -4,7 +4,6 @@ on:
   push:
     branches: ["main"]
   workflow_dispatch:
-  # Добавляем расписание! Запуск каждые 3 часа
   schedule:
     - cron: '0 */3 * * *' 
 
@@ -24,7 +23,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # --- НАЧАЛО МАГИИ PYTHON ---
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -36,17 +34,14 @@ jobs:
           pip install requests python-dotenv telethon
 
       - name: Run News Parser
-        # Передаем секреты из настроек GitHub в переменные окружения скрипта
         env:
           NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
           TG_API_ID: ${{ secrets.TG_API_ID }}
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
-          TG_SESSION: ${{ secrets.TG_SESSION }} # Исправлено на секретную строку!
-        # Исправлен путь к файлу (указана папка python-script)
+          TG_SESSION: ${{ secrets.TG_SESSION }}
+        # ВАЖНО: Проверь путь к файлу! Если скрипт в корне, убери "python-script/"
         run: python python-script/news_aggregator.py 
-      # --- КОНЕЦ МАГИИ PYTHON ---
 
-      # Дальше идет твой стандартный билд фронтенда
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -69,11 +64,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
     needs: build
     steps:
       - name: Deploy to GitHub Pages
