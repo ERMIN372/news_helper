@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Newspaper,
   Terminal,
@@ -100,6 +100,36 @@ export default function App() {
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const [showScriptModal, setShowScriptModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'script' | 'env' | 'readme'>('script');
+  const [copiedNewsKey, setCopiedNewsKey] = useState<string | null>(null);
+  const copyFeedbackTimeoutRef = useRef<number | null>(null);
+
+  const getPostPrompt = (item: NewsItem) =>
+    `Действуй по нашей редполитике. Напиши вирусный, вовлекающий пост для Дзена на основе этой новости: ${item.title} — ${item.description}`;
+
+  const handleCopyPostPrompt = async (item: NewsItem, itemKey: string) => {
+    try {
+      await navigator.clipboard.writeText(getPostPrompt(item));
+      setCopiedNewsKey(itemKey);
+
+      if (copyFeedbackTimeoutRef.current) {
+        window.clearTimeout(copyFeedbackTimeoutRef.current);
+      }
+
+      copyFeedbackTimeoutRef.current = window.setTimeout(() => {
+        setCopiedNewsKey(null);
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy post prompt', err);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (copyFeedbackTimeoutRef.current) {
+        window.clearTimeout(copyFeedbackTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const newsUrl = `${import.meta.env.BASE_URL}news_digest.json`;
@@ -236,14 +266,17 @@ export default function App() {
             </div>
             <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <AnimatePresence>
-                {filteredNews.map((item, index) => (
-                  <motion.article
+                {filteredNews.map((item, index) => {
+                  const itemKey = `${item.title}-${index}`;
+
+                  return (
+                    <motion.article
                     layout
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.9 }}
                     transition={{ duration: 0.2 }}
-                    key={item.title + index}
+                    key={itemKey}
                     className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-shadow flex flex-col h-full overflow-hidden group"
                   >
                     {item.image_url ? (
@@ -279,16 +312,25 @@ export default function App() {
                         <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded">
                           {item.source}
                         </span>
-                        <button
-                          onClick={() => setSelectedNews(item)}
-                          className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors"
-                        >
-                          Читать внутри <FileText className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => handleCopyPostPrompt(item, itemKey)}
+                            className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-600 hover:text-emerald-800 transition-colors"
+                          >
+                            {copiedNewsKey === itemKey ? 'Скопировано! ✅' : 'Сделать пост'}
+                          </button>
+                          <button
+                            onClick={() => setSelectedNews(item)}
+                            className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+                          >
+                            Читать внутри <FileText className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </motion.article>
-                ))}
+                  );
+                })}
               </AnimatePresence>
             </motion.div>
           </>
