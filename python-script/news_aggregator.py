@@ -92,6 +92,7 @@ class NewsAggregator:
             return
 
         logger.info("Запуск сбора новостей из Telegram...")
+        os.makedirs('public/images', exist_ok=True)
         # Подключаемся сразу через зашифрованную строку, никаких ручных вводов!
         client = TelegramClient(StringSession(TG_SESSION), TG_API_ID, TG_API_HASH)
         
@@ -105,6 +106,13 @@ class NewsAggregator:
                 # Получаем последние 5 постов из канала
                 async for message in client.iter_messages(channel, limit=8):
                     if message.text:
+                        image_url = ''
+                        if message.photo:
+                            image_filename = f"tg_{channel}_{message.id}.jpg"
+                            image_path = f"public/images/{image_filename}"
+                            await client.download_media(message.photo, file=image_path)
+                            image_url = f"images/{image_filename}"
+
                         # Простая эвристика: берем первую строку как заголовок
                         lines = message.text.strip().split('\n')
                         title = lines[0][:100] + '...' if len(lines[0]) > 100 else lines[0]
@@ -116,7 +124,7 @@ class NewsAggregator:
                             'title': title,
                             'description': description,
                             'url': f"https://t.me/{channel}/{message.id}",
-                            'image_url': '',
+                            'image_url': image_url,
                             'date': message.date.isoformat(),
                             'score': 15,
                             'sourceType': 'telegram',
