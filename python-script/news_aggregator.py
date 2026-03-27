@@ -8,7 +8,6 @@ from datetime import datetime
 import requests
 from dotenv import load_dotenv
 from telethon import TelegramClient
-from telethon.errors import SessionPasswordNeededError
 from telethon.sessions import StringSession
 
 # Настройка логирования
@@ -25,16 +24,16 @@ load_dotenv()
 NEWSAPI_KEY = os.getenv('NEWSAPI_KEY')
 TG_API_ID = int(os.getenv('TG_API_ID', 0))
 TG_API_HASH = os.getenv('TG_API_HASH')
-TG_PHONE = os.getenv('TG_PHONE')
+TG_SESSION = os.getenv('TG_SESSION') # Теперь используем строковую сессию
 
-# Темы для поиска через NewsAPI (keywords)
+# Темы для поиска через NewsAPI (перевели на русский, чтобы language='ru' работал!)
 NEWSAPI_TOPICS = {
-    "IT & AI": "artificial intelligence OR software development OR IT industry",
-    "Politics": "politics OR government",
-    "Auto": "automotive OR cars OR electric vehicles",
-    "HR Analytics": "HR analytics OR human resources trends OR recruitment",
-    "Rock/Metal": "rock music OR metal music OR heavy metal",
-    "Retail & Gas": "retail OR gas station OR fuel market"
+    "IT & AI": "искусственный интеллект OR нейросети OR IT",
+    "Politics": "политика OR правительство",
+    "Auto": "автомобили OR электромобили",
+    "HR Analytics": "управление персоналом OR HR аналитика OR рекрутмент",
+    "Rock/Metal": "рок музыка OR метал",
+    "Retail & Gas": "ритейл OR АЗС OR топливный рынок"
 }
 
 # Telegram каналы по темам (укажите реальные username каналов)
@@ -60,7 +59,7 @@ class NewsAggregator:
             try:
                 params = {
                     'q': query,
-                    'language': 'ru', # Можно изменить на 'en' для международных новостей
+                    'language': 'ru', 
                     'sortBy': 'publishedAt',
                     'pageSize': 3,
                     'apiKey': NEWSAPI_KEY
@@ -78,30 +77,25 @@ class NewsAggregator:
                             'description': article['description'],
                             'url': article['url'],
                             'date': article['publishedAt'],
-                            'score': 10 # Базовый скор для сортировки
+                            'score': 10 
                         })
             except Exception as e:
                 logger.error(f"Ошибка при получении новостей для категории {category}: {e}")
 
     async def fetch_telegram_news(self):
         """Сбор новостей из Telegram-каналов через Telethon"""
-        if not TG_API_ID or not TG_API_HASH:
-            logger.warning("Telegram API ID или Hash не заданы. Пропуск Telegram.")
+        if not TG_API_ID or not TG_API_HASH or not TG_SESSION:
+            logger.warning("Telegram креды или TG_SESSION не заданы. Пропуск Telegram.")
             return
 
         logger.info("Запуск сбора новостей из Telegram...")
-        client = TelegramClient('news_session', TG_API_ID, TG_API_HASH)
+        # Подключаемся сразу через зашифрованную строку, никаких ручных вводов!
+        client = TelegramClient(StringSession(TG_SESSION), TG_API_ID, TG_API_HASH)
         
         await client.connect()
         if not await client.is_user_authorized():
-            logger.info("Требуется авторизация в Telegram...")
-            await client.send_code_request(TG_PHONE)
-            code = input('Введите код из Telegram: ')
-            try:
-                await client.sign_in(TG_PHONE, code)
-            except SessionPasswordNeededError:
-                password = input('Введите пароль 2FA: ')
-                await client.sign_in(password=password)
+            logger.error("Сессия устарела или неверна! Нужно пересоздать TG_SESSION.")
+            return
                 
         for channel in TELEGRAM_CHANNELS:
             try:
@@ -120,7 +114,7 @@ class NewsAggregator:
                             'description': description,
                             'url': f"https://t.me/{channel}/{message.id}",
                             'date': message.date.isoformat(),
-                            'score': 15 # Telegram посты могут иметь больший вес
+                            'score': 15 
                         })
             except Exception as e:
                 logger.error(f"Ошибка чтения канала {channel}: {e}")
@@ -129,10 +123,8 @@ class NewsAggregator:
 
     def rank_and_filter_news(self) -> List[Dict[Any, Any]]:
         """Простая система ранжирования для формирования Топ-10"""
-        # Сортируем по дате (в реальности здесь может быть сложный AI-алгоритм)
         sorted_news = sorted(self.news_items, key=lambda x: x['date'], reverse=True)
         
-        # Убираем дубликаты по заголовку
         seen_titles = set()
         unique_news = []
         for item in sorted_news:
@@ -142,8 +134,11 @@ class NewsAggregator:
                 
         return unique_news[:10]
 
-    def export_to_json(self, top_news, filename="top_10_news.json"):
-        """Экспорт новостей для сайта (например, frontend React сможет его прочитать)"""
+    def export_to_json(self, top_news, filename="public/news_digest.json"):
+        """Экспорт новостей для сайта"""
+        # БРОНЯ: Создаем папку, если ее физически нет на сервере
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(top_news, f, ensure_ascii=False, indent=4)
         logger.info(f"Дайджест сохранен в {filename}")
@@ -151,10 +146,10 @@ class NewsAggregator:
 async def main():
     aggregator = NewsAggregator()
     
-    # Сбор из REST API (синхронно)
+    # Сбор из REST API
     aggregator.fetch_news_api()
     
-    # Сбор из Telegram (асинхронно)
+    # Сбор из Telegram 
     await aggregator.fetch_telegram_news()
     
     # Формирование Топ-10
@@ -164,7 +159,7 @@ async def main():
     for i, news in enumerate(top_10, 1):
         logger.info(f"{i}. [{news['category']}] {news['title']} ({news['source']})")
         
-    # Сохраняем в JSON для загрузки на сайт
+    # Путь сохранения изменен на тот, что требует твой деплой
     aggregator.export_to_json(top_10, "public/news_digest.json")
 
 if __name__ == "__main__":
