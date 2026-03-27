@@ -23,6 +23,7 @@ interface NewsItem {
   description: string;
   content?: string;
   url: string;
+  image_url?: string;
   date: string;
   score: number;
 }
@@ -245,6 +246,18 @@ export default function App() {
                     key={item.title + index}
                     className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-shadow flex flex-col h-full overflow-hidden group"
                   >
+                    {item.image_url ? (
+                      <img
+                        src={item.image_url}
+                        alt={item.title}
+                        className="w-full h-48 object-cover rounded-t-lg"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-48 rounded-t-lg bg-gradient-to-br from-slate-800 via-indigo-700 to-blue-500 flex items-center justify-center">
+                        <Newspaper className="w-12 h-12 text-white/90" />
+                      </div>
+                    )}
                     <div className="p-6 flex flex-col flex-grow">
                       <div className="flex items-center justify-between mb-4 gap-2">
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-100">
